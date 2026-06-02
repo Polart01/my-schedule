@@ -1,0 +1,350 @@
+import { useState } from "react";
+
+const COLORS = {
+  money: { bg: "#fff8e6", accent: "#e6a817", text: "#7a4f00", label: "💰 Money" },
+  learn: { bg: "#e8f5ee", accent: "#2f9e5e", text: "#1a5c35", label: "📚 Learn" },
+  fixed: { bg: "#f0f4ff", accent: "#4a6cf7", text: "#1e3a8a", label: "🔒 Fixed" },
+  break: { bg: "#fdf0f0", accent: "#e06060", text: "#7a2020", label: "☕ Break" },
+};
+
+const EMOJIS = ["📚","💰","🎧","✍️","🎨","💻","📱","🏃","🧘","🎯","🔧","📝","🎤","🌱","💡","🤝","📷","🎵"];
+
+const initialItems = [
+  { id: 1, time: "6:10 AM", endTime: "8:00 AM", emoji: "🚌", title: "Morning Bus", note: "Use this time wisely!", type: "fixed", editable: false },
+  { id: 2, time: "8:00 AM", endTime: "10:00 AM", emoji: "🏫", title: "School", note: "", type: "fixed", editable: false },
+  { id: 3, time: "10:00 AM", endTime: "10:30 AM", emoji: "☕", title: "Tea Break", note: "30 min", type: "break", editable: false },
+  { id: 4, time: "10:30 AM", endTime: "12:00 PM", emoji: "🏫", title: "School", note: "", type: "fixed", editable: false },
+  { id: 5, time: "12:00 PM", endTime: "1:00 PM", emoji: "🍱", title: "Lunch Break", note: "1 hour", type: "break", editable: false },
+  { id: 6, time: "1:00 PM", endTime: "2:30 PM", emoji: "🏫", title: "School", note: "", type: "fixed", editable: false },
+  { id: 7, time: "2:30 PM", endTime: "3:00 PM", emoji: "🔔", title: "School Ends", note: "Pack up & head out", type: "fixed", editable: false },
+  { id: 8, time: "3:00 PM", endTime: "4:30 PM", emoji: "🚌", title: "Bus Ride Home", note: "1.5 hours", type: "fixed", editable: false },
+];
+
+const suggestions = {
+  "6:10 AM": [
+    { emoji: "📚", title: "Read / Audiobook", type: "learn", note: "Fiction or non-fiction" },
+    { emoji: "🎧", title: "Podcast / YouTube Learning", type: "learn", note: "e.g. finance, tech, skills" },
+    { emoji: "✍️", title: "Journal / Plan the day", type: "learn", note: "Set daily goals" },
+    { emoji: "💡", title: "Study flashcards", type: "learn", note: "Use Anki or Quizlet" },
+  ],
+  "10:00 AM": [
+    { emoji: "📱", title: "Check freelance gigs", type: "money", note: "Fiverr, Upwork alerts" },
+    { emoji: "✍️", title: "Write content / posts", type: "money", note: "Blog or social media" },
+    { emoji: "💡", title: "Brainstorm ideas", type: "learn", note: "Side hustle ideas" },
+  ],
+  "12:00 PM": [
+    { emoji: "💻", title: "Online course lesson", type: "learn", note: "Udemy, Coursera etc." },
+    { emoji: "📝", title: "Work on a side project", type: "money", note: "Build something" },
+    { emoji: "📷", title: "Create content", type: "money", note: "Photos, videos, posts" },
+    { emoji: "🤝", title: "Network online", type: "money", note: "LinkedIn, Discord" },
+    { emoji: "📚", title: "Read an article / book", type: "learn", note: "15–20 mins reading" },
+  ],
+  "3:00 PM": [
+    { emoji: "💻", title: "Freelance work", type: "money", note: "Coding, design, writing" },
+    { emoji: "🎨", title: "Work on a skill", type: "learn", note: "Art, music, coding" },
+    { emoji: "📱", title: "Sell products online", type: "money", note: "Etsy, eBay, FB marketplace" },
+    { emoji: "🎧", title: "Podcast / audiobook", type: "learn", note: "Use commute time" },
+    { emoji: "✍️", title: "Write & publish content", type: "money", note: "Blog, newsletter, social" },
+  ],
+};
+
+export default function Schedule() {
+  const [items, setItems] = useState(initialItems);
+  const [expanded, setExpanded] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editData, setEditData] = useState({});
+  const [addingAfter, setAddingAfter] = useState(null);
+  const [newItem, setNewItem] = useState({ emoji: "📚", title: "", note: "", type: "learn" });
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  const gaps = ["6:10 AM", "10:00 AM", "12:00 PM", "3:00 PM"];
+
+  function startEdit(item) {
+    setEditingId(item.id);
+    setEditData({ title: item.title, note: item.note, emoji: item.emoji });
+  }
+
+  function saveEdit(id) {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, ...editData } : i));
+    setEditingId(null);
+  }
+
+  function deleteItem(id) {
+    setItems(prev => prev.filter(i => i.id !== id));
+  }
+
+  function addItem(afterId) {
+    if (!newItem.title.trim()) return;
+    const idx = items.findIndex(i => i.id === afterId);
+    const after = items[idx];
+    const next = items[idx + 1];
+    const fresh = {
+      id: Date.now(),
+      time: after?.endTime || after?.time,
+      endTime: next?.time || "",
+      emoji: newItem.emoji,
+      title: newItem.title,
+      note: newItem.note,
+      type: newItem.type,
+      editable: true,
+    };
+    const updated = [...items];
+    updated.splice(idx + 1, 0, fresh);
+    setItems(updated);
+    setAddingAfter(null);
+    setNewItem({ emoji: "📚", title: "", note: "", type: "learn" });
+  }
+
+  function addSuggestion(afterId, sug) {
+    const idx = items.findIndex(i => i.id === afterId);
+    const after = items[idx];
+    const next = items[idx + 1];
+    const fresh = {
+      id: Date.now(),
+      time: after?.endTime || after?.time,
+      endTime: next?.time || "",
+      emoji: sug.emoji,
+      title: sug.title,
+      note: sug.note,
+      type: sug.type,
+      editable: true,
+    };
+    const updated = [...items];
+    updated.splice(idx + 1, 0, fresh);
+    setItems(updated);
+    setExpanded(null);
+  }
+
+  const typeStyle = (type) => COLORS[type] || COLORS.learn;
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #0f1b35 0%, #1a2f5e 50%, #0f2a45 100%)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "flex-start",
+      padding: "2rem 1rem",
+      fontFamily: "'Georgia', serif",
+    }}>
+      <div style={{ width: "100%", maxWidth: 480 }}>
+
+        {/* Header */}
+        <div style={{ marginBottom: "1.5rem", textAlign: "center" }}>
+          <div style={{ fontSize: "0.7rem", letterSpacing: "0.2em", color: "#f5a623", textTransform: "uppercase", marginBottom: "0.3rem" }}>My Daily Planner</div>
+          <h1 style={{ fontSize: "2rem", fontWeight: 900, color: "#fff", lineHeight: 1.1 }}>School Day<br/><span style={{ color: "#f5a623" }}>+ Hustle Time</span></h1>
+          <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", marginTop: "0.8rem", flexWrap: "wrap" }}>
+            {Object.entries(COLORS).map(([k, v]) => (
+              <span key={k} style={{ fontSize: "0.68rem", background: v.bg, color: v.text, border: `1px solid ${v.accent}`, borderRadius: 20, padding: "0.15rem 0.6rem", fontFamily: "sans-serif" }}>
+                {v.label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Timeline */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          {items.map((item, idx) => {
+            const s = typeStyle(item.type);
+            const isEditing = editingId === item.id;
+            const isGap = gaps.includes(item.time);
+            const hasSugs = isGap && suggestions[item.time];
+
+            return (
+              <div key={item.id}>
+                {/* Item Row */}
+                <div style={{
+                  display: "flex",
+                  gap: "0.8rem",
+                  alignItems: "flex-start",
+                  position: "relative",
+                  paddingBottom: "0.2rem",
+                }}>
+                  {/* Line */}
+                  {idx < items.length - 1 && (
+                    <div style={{
+                      position: "absolute",
+                      left: 18,
+                      top: 38,
+                      bottom: -8,
+                      width: 2,
+                      background: `linear-gradient(to bottom, ${s.accent}44, transparent)`,
+                      zIndex: 0,
+                    }} />
+                  )}
+
+                  {/* Emoji bubble */}
+                  <div style={{
+                    flexShrink: 0,
+                    width: 38, height: 38,
+                    borderRadius: "50%",
+                    background: s.bg,
+                    border: `2px solid ${s.accent}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "1rem",
+                    position: "relative", zIndex: 1,
+                    cursor: item.editable ? "pointer" : "default",
+                  }}
+                    onClick={() => item.editable && startEdit(item)}
+                  >
+                    {item.emoji}
+                  </div>
+
+                  {/* Content */}
+                  <div style={{
+                    flex: 1,
+                    background: "#ffffff0d",
+                    borderRadius: 14,
+                    padding: "0.55rem 0.8rem",
+                    border: `1px solid ${s.accent}22`,
+                    marginBottom: "0.6rem",
+                  }}>
+                    {isEditing ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                        {/* Emoji picker */}
+                        <div style={{ position: "relative" }}>
+                          <button onClick={() => setShowEmojiPicker(p => !p)} style={{
+                            fontSize: "1.2rem", background: s.bg, border: `1px solid ${s.accent}`, borderRadius: 8,
+                            padding: "0.2rem 0.5rem", cursor: "pointer"
+                          }}>{editData.emoji}</button>
+                          {showEmojiPicker && (
+                            <div style={{
+                              position: "absolute", top: "110%", left: 0, zIndex: 99,
+                              background: "#1e2d50", border: "1px solid #4a6cf7", borderRadius: 12,
+                              padding: "0.5rem", display: "flex", flexWrap: "wrap", gap: "0.3rem", width: 200
+                            }}>
+                              {EMOJIS.map(e => (
+                                <span key={e} style={{ cursor: "pointer", fontSize: "1.2rem", padding: "0.1rem" }}
+                                  onClick={() => { setEditData(d => ({ ...d, emoji: e })); setShowEmojiPicker(false); }}>
+                                  {e}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <input value={editData.title} onChange={e => setEditData(d => ({ ...d, title: e.target.value }))}
+                          placeholder="Activity title"
+                          style={{ padding: "0.35rem 0.5rem", borderRadius: 8, border: "1px solid #4a6cf7", background: "#0d1a35", color: "#fff", fontSize: "0.85rem", fontFamily: "sans-serif" }} />
+                        <input value={editData.note} onChange={e => setEditData(d => ({ ...d, note: e.target.value }))}
+                          placeholder="Note (optional)"
+                          style={{ padding: "0.35rem 0.5rem", borderRadius: 8, border: "1px solid #4a6cf744", background: "#0d1a35", color: "#ccc", fontSize: "0.78rem", fontFamily: "sans-serif" }} />
+                        <div style={{ display: "flex", gap: "0.4rem" }}>
+                          {["money","learn","break"].map(t => (
+                            <button key={t} onClick={() => setEditData(d => ({ ...d, type: t }))} style={{
+                              fontSize: "0.7rem", padding: "0.2rem 0.5rem", borderRadius: 20,
+                              background: editData.type === t ? COLORS[t].accent : "#1e2d50",
+                              color: editData.type === t ? "#fff" : "#aaa",
+                              border: `1px solid ${COLORS[t].accent}`,
+                              cursor: "pointer", fontFamily: "sans-serif"
+                            }}>{COLORS[t].label}</button>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: "0.4rem" }}>
+                          <button onClick={() => saveEdit(item.id)} style={{
+                            flex: 1, padding: "0.3rem", background: "#2f9e5e", color: "#fff",
+                            border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.8rem", fontFamily: "sans-serif"
+                          }}>✓ Save</button>
+                          <button onClick={() => setEditingId(null)} style={{
+                            padding: "0.3rem 0.6rem", background: "#333", color: "#aaa",
+                            border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.8rem", fontFamily: "sans-serif"
+                          }}>✕</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div>
+                            <div style={{ fontSize: "0.72rem", color: s.accent, fontFamily: "sans-serif", fontWeight: 600, marginBottom: 1 }}>{item.time}{item.endTime ? ` – ${item.endTime}` : ""}</div>
+                            <div style={{ fontSize: "0.9rem", color: "#fff", fontWeight: 700, lineHeight: 1.2 }}>{item.title}</div>
+                            {item.note && <div style={{ fontSize: "0.75rem", color: "#8ba0c0", marginTop: "0.15rem", fontFamily: "sans-serif" }}>{item.note}</div>}
+                          </div>
+                          {item.editable && (
+                            <div style={{ display: "flex", gap: "0.3rem", flexShrink: 0, marginLeft: "0.5rem" }}>
+                              <button onClick={() => startEdit(item)} style={{
+                                background: "#ffffff15", border: "none", borderRadius: 7, color: "#8ba0c0",
+                                fontSize: "0.75rem", padding: "0.2rem 0.45rem", cursor: "pointer"
+                              }}>✏️</button>
+                              <button onClick={() => deleteItem(item.id)} style={{
+                                background: "#ff444415", border: "none", borderRadius: 7, color: "#ff8080",
+                                fontSize: "0.75rem", padding: "0.2rem 0.45rem", cursor: "pointer"
+                              }}>🗑</button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Suggestions panel for gap slots */}
+                {hasSugs && (
+                  <div style={{ marginLeft: 46, marginBottom: "0.5rem", marginTop: "-0.3rem" }}>
+                    <button onClick={() => setExpanded(expanded === item.id ? null : item.id)} style={{
+                      fontSize: "0.72rem", background: "transparent", border: `1px dashed #f5a62388`,
+                      color: "#f5a623", borderRadius: 20, padding: "0.2rem 0.7rem",
+                      cursor: "pointer", fontFamily: "sans-serif", marginBottom: "0.4rem"
+                    }}>
+                      {expanded === item.id ? "▲ Hide ideas" : "✨ Add activity here"}
+                    </button>
+
+                    {expanded === item.id && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                        {suggestions[item.time].map((sug, si) => {
+                          const ss = typeStyle(sug.type);
+                          return (
+                            <button key={si} onClick={() => addSuggestion(item.id, sug)} style={{
+                              display: "flex", alignItems: "center", gap: "0.6rem",
+                              background: ss.bg + "22", border: `1px solid ${ss.accent}55`,
+                              borderRadius: 10, padding: "0.45rem 0.7rem",
+                              cursor: "pointer", textAlign: "left", width: "100%",
+                            }}>
+                              <span style={{ fontSize: "1rem" }}>{sug.emoji}</span>
+                              <div>
+                                <div style={{ fontSize: "0.82rem", color: "#e0eaff", fontWeight: 600, fontFamily: "sans-serif" }}>{sug.title}</div>
+                                <div style={{ fontSize: "0.7rem", color: ss.accent, fontFamily: "sans-serif" }}>{COLORS[sug.type].label} · {sug.note}</div>
+                              </div>
+                              <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#4a6cf7", fontFamily: "sans-serif" }}>+ Add</span>
+                            </button>
+                          );
+                        })}
+
+                        {/* Custom add */}
+                        {addingAfter === item.id ? (
+                          <div style={{ background: "#0d1a3580", border: "1px solid #4a6cf7", borderRadius: 12, padding: "0.7rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                            <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                              {EMOJIS.slice(0,10).map(e => (
+                                <span key={e} onClick={() => setNewItem(n => ({ ...n, emoji: e }))}
+                                  style={{ cursor: "pointer", fontSize: "1.1rem", background: newItem.emoji === e ? "#4a6cf755" : "transparent", borderRadius: 6, padding: "0.1rem 0.2rem" }}>{e}</span>
+                              ))}
+                            </div>
+                            <input value={newItem.title} onChange={e => setNewItem(n => ({ ...n, title: e.target.value }))}
+                              placeholder="Activity name…"
+                              style={{ padding: "0.35rem 0.5rem", borderRadius: 8, border: "1px solid #4a6cf7", background: "#0d1a35", color: "#fff", fontSize: "0.85rem", fontFamily: "sans-serif" }} />
+                            <input value={newItem.note} onChange={e => setNewItem(n => ({ ...n, note: e.target.value }))}
+                              placeholder="Short note (optional)"
+                              style={{ padding: "0.35rem 0.5rem", borderRadius: 8, border: "1px solid #4a6cf744", background: "#0d1a35", color: "#ccc", fontSize: "0.78rem", fontFamily: "sans-serif" }} />
+                            <div style={{ display: "flex", gap: "0.4rem" }}>
+                              {["money","learn"].map(t => (
+                                <button key={t} onClick={() => setNewItem(n => ({ ...n, type: t }))} style={{
+                                  fontSize: "0.7rem", padding: "0.2rem 0.6rem", borderRadius: 20,
+                                  background: newItem.type === t ? COLORS[t].accent : "#1e2d50",
+                                  color: newItem.type === t ? "#fff" : "#aaa",
+                                  border: `1px solid ${COLORS[t].accent}`,
+                                  cursor: "pointer", fontFamily: "sans-serif"
+                                }}>{COLORS[t].label}</button>
+                              ))}
+                            </div>
+                            <div style={{ display: "flex", gap: "0.4rem" }}>
+                              <button onClick={() => addItem(item.id)} style={{
+                                flex: 1, padding: "0.35rem", background: "#2f9e5e", color: "#fff",
+                                border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.82rem", fontFamily: "sans-serif"
+                              }}>✓ Add to schedule</button>
+                              <button onClick={() => setAddingAfter(null)} style={{
+                                padding: "0.35rem 0.6rem", background: "#333", color: "#aaa",
+                                border: "none", borderRadius: 8, cursor: "pointer", fontSize: "0.82rem", fontFamily: "sans-serif"
+                              }}>✕</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button onClick={() => setAddingAfter(item.id)} style={{
+                            fontSize: "0.75re
